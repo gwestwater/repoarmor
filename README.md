@@ -24,7 +24,7 @@ RepoArmor is built on top of the open-source [TruffleHog](https://github.com/tru
 
 ## Demo
 
-https://github.com/user-attachments/assets/ddf0bab0-0885-402d-ab83-5321845cfe27
+https://github.com/user-attachments/assets/2c2c3c3f-4eab-46a3-95d0-7597e90ee802
 
 ## Installation
 
