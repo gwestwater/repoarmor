@@ -1,0 +1,75 @@
+# RepoArmor Configuration
+
+database:
+  # Path to SQLite database file
+  path: ~/.repoarmor/scanner.db
+
+scanner:
+  # Path to TruffleHog binary (or just 'trufflehog' if in PATH)
+  trufflehog_path: trufflehog
+
+  # Default number of commits to scan
+  default_depth: 50
+
+  # Number of parallel scans for batch mode
+  parallel_scans: 2
+
+  # Timeout per repository scan (seconds)
+  timeout: 300
+
+  # Only include findings verified by TruffleHog
+  only_verified: false
+
+# File patterns to ignore during scanning
+ignore_patterns:
+  - "*.test.js"
+  - "*.test.ts"
+  - "*_test.go"
+  - "*_test.py"
+  - "vendor/*"
+  - "node_modules/*"
+  - ".git/*"
+
+# Map detector types to severity levels
+# Any detector containing the key (case-insensitive) gets that severity
+severity_mapping:
+  AWS: high
+  GitHub: high
+  GitLab: high
+  Slack: high
+  PrivateKey: high
+  GoogleAPIKey: high
+  Stripe: high
+  Twilio: high
+  SendGrid: high
+  Mailchimp: medium
+  NPM: medium
+  PyPI: medium
+  NuGet: medium
+  URI: low
+  Base64: low
+
+output:
+  # Default output format: table, json, or csv
+  default_format: table
+
+  # Date format for display
+  date_format: "%Y-%m-%d %H:%M"
+
+# LLM configuration for 'chat' command
+llm:
+  # Provider (only 'openai' is supported)
+  provider: openai
+
+  # Model override (optional, uses provider default if not set)
+  # For OpenAI: gpt-4o, gpt-4-turbo, etc.
+  model: null
+
+  # API key (optional, uses OPENAI_API_KEY environment variable if not set)
+  api_key: null
+
+# Identity classification for 'check-org-members' / 'check-repo-collaborators'
+identity:
+  # Email domains considered "internal" (employees). Anything else is flagged external.
+  # Optional: you can instead pass --internal-domain / -d on the command line.
+  internal_email_domains: []

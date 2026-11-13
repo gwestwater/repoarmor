@@ -1,0 +1,178 @@
+name: Security Scans
+on:
+  pull_request:
+  push:
+    branches: [main]
+  schedule:
+    - cron: "0 2 * * 1" # Weekly, Monday 02:00 UTC
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  prepare-requirements:
+    name: Prepare Black Duck requirements
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.x"
+
+      - name: Generate requirements.txt for Detect
+        run: |
+          pip install .
+          pip freeze > requirements.txt
+
+      - name: Upload requirements.txt
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: blackduck-requirements
+          path: requirements.txt
+          if-no-files-found: error
+
+  blackduck-sca:
+    name: Black Duck SCA
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: prepare-requirements
+    # Fork PRs and Dependabot PRs don't receive repository secrets
+    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.user.login != 'dependabot[bot]'
+    permissions:
+      contents: read
+      pull-requests: write # PR comment with scan results
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Download requirements.txt
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: blackduck-requirements
+
+      - name: Set up Python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.x"
+
+      # Detect's pip inspector can only resolve packages that are installed
+      - name: Install dependencies for Detect
+        run: pip install .
+
+      # Calls the vendor action directly: the shared wrapper hardcodes PR comments on
+      - name: Black Duck SCA Scan
+        uses: blackduck-inc/black-duck-security-scan@152247222aa9cd38124acd5c0cf60f4db71adc3f # v2.11.0
+        env:
+          DETECT_PROJECT_NAME: ${{ github.event.repository.name }}
+          DETECT_PROJECT_GROUP_NAME: ${{ vars.BLACKDUCK_PROJECT_GROUP }}
+          DETECT_PROJECT_VERSION_NAME: ${{ github.base_ref }}
+        with:
+          blackducksca_url: ${{ vars.BLACKDUCK_URL }}
+          blackducksca_token: ${{ secrets.BLACKDUCKSCA_TOKEN }}
+          blackducksca_scan_full: false
+          project_directory: '.'
+          blackducksca_scan_failure_severities: 'BLOCKER,CRITICAL,MAJOR'
+          detect_search_depth: '10'
+          detect_args: '--detect.excluded.directories=.* --detect.accuracy.required=NONE --detect.blackduck.signature.scanner.snippet.matching=SNIPPET_MATCHING --detect.blackduck.rapid.compare.mode=ALL'
+          blackducksca_prComment_enabled: false
+
+  blackduck-sca-non-pr:
+    name: Black Duck SCA (non-PR)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: prepare-requirements
+    if: github.event_name != 'pull_request'
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Download requirements.txt
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: blackduck-requirements
+
+      - name: Set up Python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.x"
+
+      # Detect's pip inspector can only resolve packages that are installed
+      - name: Install dependencies for Detect
+        run: pip install .
+
+      - name: Black Duck SCA Scan
+        uses: prgs-community/githubactions-reusableworkflows/actions/blackduck@43d618ad5fcfaa013da49f02c6a4dabc1e73440d
+        with:
+          blackduck-token: ${{ secrets.BLACKDUCKSCA_TOKEN }}
+          project-group-name: ${{ vars.BLACKDUCK_PROJECT_GROUP }}
+
+  polaris-sast:
+    name: Polaris SAST
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    # Fork PRs and Dependabot PRs don't receive repository secrets
+    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.user.login != 'dependabot[bot]'
+    permissions:
+      contents: read
+      pull-requests: write # PR comment with scan results
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # Calls the vendor action directly: the shared wrapper hardcodes PR comments on
+      - name: Run Polaris SAST Scan
+        uses: blackduck-inc/black-duck-security-scan@152247222aa9cd38124acd5c0cf60f4db71adc3f # v2.11.0
+        with:
+          polaris_server_url: 'https://polaris.blackduck.com'
+          polaris_access_token: ${{ secrets.POLARIS_ACCESS_TOKEN }}
+          polaris_application_name: ${{ vars.POLARIS_APPLICATION_NAME }}
+          polaris_project_name: ${{ github.event.repository.name }}
+          polaris_assessment_types: 'SAST'
+          polaris_test_sast_type: 'SAST_RAPID'
+          polaris_assessment_mode: 'CI'
+          polaris_branch_parent_name: ${{ github.base_ref }}
+          project_directory: '.'
+          polaris_waitForScan: 'true'
+          polaris_test_sast_location: 'hybrid'
+          mark_build_status: 'failure'
+          polaris_prComment_enabled: false
+
+  polaris-sast-non-pr:
+    name: Polaris SAST (non-PR)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    if: github.event_name != 'pull_request'
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Run Polaris SAST Scan
+        uses: prgs-community/githubactions-reusableworkflows/actions/polaris@43d618ad5fcfaa013da49f02c6a4dabc1e73440d
+        with:
+          polaris-access-token: ${{ secrets.POLARIS_ACCESS_TOKEN }}
+          application-name: ${{ vars.POLARIS_APPLICATION_NAME }}

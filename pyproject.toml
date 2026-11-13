@@ -1,0 +1,61 @@
+[project]
+name = "repoarmor"
+version = "0.3.1"
+description = "A CLI tool for managing TruffleHog secret scanning results"
+readme = "README.md"
+license = "Apache-2.0"
+license-files = ["LICENSE", "NOTICE"]
+authors = [
+    { name = "Progress Software Corporation" },
+    { name = "Murat Zhumagali" },
+]
+keywords = ["secrets", "trufflehog", "security", "cli", "secret-scanning"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Security",
+]
+requires-python = ">=3.10"
+dependencies = [
+    "typer>=0.9.0",
+    "rich>=13.0.0",
+    "sqlalchemy>=2.0.0",
+    "pydantic>=2.4.0",
+    "pydantic-settings>=2.0.0",
+    "pyyaml>=6.0",
+    "requests>=2.33.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
+]
+llm = [
+    "openai>=1.50.0",
+]
+all = [
+    "repoarmor[dev,llm]",
+]
+
+[project.urls]
+Homepage = "https://github.com/progress/repoarmor"
+Source = "https://github.com/progress/repoarmor"
+Issues = "https://github.com/progress/repoarmor/issues"
+
+[project.scripts]
+repoarmor = "repoarmor.main:app"
+
+[build-system]
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["repoarmor"]
